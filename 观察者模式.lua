@@ -6,10 +6,6 @@ function EventCenter:ctor()
     self.eventList = {} -- 事件列表
     self.handleList = {} -- 句柄列表
 end
-function EventCenter:Subscribe(eventId, obj, func)
-    local handle = closure(func, obj)
-    self:Subscribe(eventId, handle)
-end
 function EventCenter:Subscribe(eventId, handle)
     if self.handleList[eventId] == nil then
         self.handleList[eventId] = {}
@@ -78,23 +74,39 @@ function Sender:SendNow()
     SingleEventCenter:NotifyNow(self, EventName.Event3, {"事件3"})
 end
 
+-- 事件管理器
+local ListenerBase = class("ListenerBase")
+function ListenerBase:ctor()
+    self.events = {}
+end
+function ListenerBase:Subscribe(eventId, handle)
+    if self.events[eventId] ~= nil then
+        error("重复订阅事件")
+    end
+    self.events[eventId] = handle
+    SingleEventCenter:Subscribe(eventId, handle)
+end
+function ListenerBase:Destroy()
+    print("事件销毁")
+    for k,v in pairs(self.events) do
+        SingleEventCenter:UnSubscribe(k, v)
+    end
+end
+
 -- 观察者(接收者)
-local Listener = class("Listener")
+local Listener = class("Listener", ListenerBase)
 function Listener:ctor()
-    self.handle = closure(self.OnEvent, self)
-    SingleEventCenter:Subscribe(EventName.Event1, self.handle)
-    SingleEventCenter:Subscribe(EventName.Event2, self.handle)
-    SingleEventCenter:Subscribe(EventName.Event3, self.handle)
+    self.super.ctor(self)
+    self:Subscribe(EventName.Event1, closure(self.OnEvent, self))
+    self:Subscribe(EventName.Event2, closure(self.OnEvent, self))
+    self:Subscribe(EventName.Event3, closure(self.OnEvent, self))
 end
 function Listener:OnEvent(data, sender)
     print("接收到事件", sender, next(data))
     -- dump(data)
 end
 function Listener:Destroy()
-    print("Listener销毁")
-    SingleEventCenter:UnSubscribe(EventName.Event1, self.handle)
-    SingleEventCenter:UnSubscribe(EventName.Event2, self.handle)
-    SingleEventCenter:UnSubscribe(EventName.Event3, self.handle)
+    self.super.Destroy(self)
 end
 
 
